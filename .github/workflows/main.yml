@@ -4,61 +4,50 @@ on:
   workflow_dispatch:
 
 jobs:
-  debian-rdp:
+  debian:
     runs-on: ubuntu-latest
     timeout-minutes: 360
-
-    container:
-      image: debian:12
 
     steps:
       - name: Update System
         run: |
-          apt update
-          apt install -y sudo wget curl gnupg2 software-properties-common
+          sudo apt update
+          sudo apt upgrade -y
 
       - name: Install XFCE + XRDP
         run: |
-          apt install -y xfce4 xfce4-goodies xrdp dbus-x11
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11
 
-          echo xfce4-session > /etc/skel/.xsession
-
-          systemctl enable xrdp || true
+      - name: Configure XRDP
+        run: |
+          echo "startxfce4" | sudo tee /etc/skel/.xsession
 
       - name: Create User
         run: |
-          useradd -m -s /bin/bash RDP
-          echo "RDP:Password123!" | chpasswd
-          usermod -aG sudo RDP
-          echo xfce4-session > /home/RDP/.xsession
-          chown RDP:RDP /home/RDP/.xsession
+          sudo useradd -m -s /bin/bash RDP
+          echo "RDP:Password123!" | sudo chpasswd
+          sudo usermod -aG sudo RDP
+          echo "startxfce4" | sudo tee /home/RDP/.xsession
+          sudo chown RDP:RDP /home/RDP/.xsession
 
-      - name: Install Tailscale
+      - name: Start XRDP
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
+          sudo systemctl status xrdp --no-pager
 
-      - name: Connect Tailscale
-        run: |
-          tailscaled &
-          sleep 5
-
-          tailscale up \
-            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} \
-            --hostname=github-debian
-
-      - name: Show Connection
+      - name: Show Login Info
         run: |
           echo "======================"
-          echo "User : RDP"
-          echo "Pass : Password123!"
-          echo "IP:"
-          tailscale ip -4
+          echo "Username : RDP"
+          echo "Password : Password123!"
+          echo "Port     : 3389"
           echo "======================"
 
-      - name: Keep Alive
+      - name: Keep Runner Alive
         run: |
           while true
           do
-            date
+            echo "Runner Active - $(date)"
             sleep 300
           done
